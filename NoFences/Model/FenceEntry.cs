@@ -53,10 +53,16 @@ namespace NoFences.Model
                 // start asynchronously
                 try
                 {
-                    if (Type == EntryType.File)
-                        Process.Start(Path);
-                    else if (Type == EntryType.Folder)
-                        Process.Start("explorer.exe", Path);
+					ProcessStartInfo psi = new ProcessStartInfo();
+					psi.FileName = Path;
+					psi.WorkingDirectory = System.IO.Path.GetDirectoryName(Path);
+					if (Type == EntryType.Folder)
+                    {
+                        psi.WorkingDirectory = Path;
+                        psi.Arguments = Path;
+						psi.FileName = "explorer.exe";
+					}
+					Process.Start(psi);
                 }
                 catch (Exception e)
                 {
