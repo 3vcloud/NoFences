@@ -58,7 +58,6 @@ namespace NoFences.Model
 					psi.WorkingDirectory = System.IO.Path.GetDirectoryName(Path);
 					if (Type == EntryType.Folder)
                     {
-                        psi.WorkingDirectory = Path;
                         psi.Arguments = Path;
 						psi.FileName = "explorer.exe";
 					}
