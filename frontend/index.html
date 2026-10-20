@@ -288,7 +288,7 @@
 (() => {
   'use strict';
 
-  // The host answers each request with window.gwlReceive({id, result}) or ({id, error}).
+  // The host answers each request with window.hostReceive({id, result}) or ({id, error}).
   const pending = new Map();
   let nextRequest = 1;
 
@@ -299,13 +299,13 @@
       const text = JSON.stringify({ id, method, args });
       if (window.chrome && window.chrome.webview) {
         window.chrome.webview.postMessage(text);
-      } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.gwl) {
-        window.webkit.messageHandlers.gwl.postMessage(text);
+      } else if (window.webkit && window.webkit.messageHandlers && window.webkit.messageHandlers.host) {
+        window.webkit.messageHandlers.host.postMessage(text);
       }
     });
   }
 
-  window.gwlReceive = (message) => {
+  window.hostReceive = (message) => {
     const request = pending.get(message.id);
     if (!request) {
       return;
@@ -787,7 +787,19 @@
     });
   }
 
-  call('state').then(apply).catch(reportProblem);
+  // The host calls this when a file in the fence's folders changes. The items are only drawn again when the state is different.
+  let lastState = '';
+  function refreshState() {
+    return call('state').then((next) => {
+      const text = JSON.stringify(next);
+      if (text !== lastState) {
+        lastState = text;
+        apply(next);
+      }
+    });
+  }
+  window.refreshFromHost = () => refreshState().catch(reportProblem);
+  refreshState().catch(reportProblem);
 })();
 </script>
 </body>

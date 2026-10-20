@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include <cstdint>
 #include <optional>
 #include <string>
 #include <vector>
@@ -20,6 +21,9 @@ std::string entryLabel(const std::string& entry);
 
 // Whether the entry can be shown. A link always can; a path only while it exists.
 bool entryExists(const std::string& entry);
+
+// When the entry's file was last written, as a number that changes whenever it's written again. Zero for an entry with no file.
+std::int64_t entryWriteStamp(const std::string& entry);
 
 // The entry's icon as PNG bytes, 32 pixels across. A Steam link shows its game's artwork, an image shows itself, and
 // everything else shows the system's icon.

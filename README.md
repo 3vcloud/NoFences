@@ -3,12 +3,14 @@
 Didn't want to pay 11€, made my own.
 
 NoFences keeps desktop fences that hold shortcuts to files, folders and links. It's written in C++, and each fence is a
-frameless window whose page is in `frontend/`. The window layer is shared with [GW Launcher](../gwdevhub_gwlauncher): WebKitGTK
-on Linux and WebView2 on Windows.
+frameless window whose page is in `frontend/`. The window layer is the [WebViewWindow](https://github.com/3vcloud/WebViewWindow)
+submodule in `third_party/WebViewWindow`: WebKitGTK on Linux and WebView2 on Windows.
 
 ![Screenshot](screenshot.png "NoFences in action")
 
 ## Build
+
+Clone with the submodule: `git clone --recurse-submodules`, or run `git submodule update --init` in an existing clone.
 
     ./build.sh            # both targets
     ./build.sh linux      # bin/linux/NoFences
@@ -46,12 +48,12 @@ Only one copy runs at a time. A second start exits straight away.
 - `frontend/index.html`: the fence page, compiled into the executable.
 - `platform/linux/`, `platform/windows/`: the windowing, the desktop facts (pointer, work area, icons, opening files, Steam
   libraries) and the single-instance lock for each platform.
-- `src/WebViewWindow.cpp`, `src/Messages.cpp`, `include/WebViewWindow.h`, `platform/*/WebViewWindow.cpp`: copied from GW Launcher.
-- `third_party/`: the GTK and WebKitGTK declarations, nlohmann/json and the WebView2 headers and loader, copied from GW Launcher.
+- `third_party/WebViewWindow`: the window layer, with the WebView2 and GTK headers and nlohmann/json it needs. NoFences defines the
+  desktop functions the window layer asks for (`showError`, `cursorPosition`, `workArea`, `workAreaAt`) in `platform/*/Desktop.cpp`.
 
 ## Differences from the original Windows app
 
 - The Windows shell context menu is replaced by the page's own menu, so "Open With" isn't offered.
-- Fences are see-through on both platforms. On Windows a fence draws its page through DirectComposition, and the blur behind it is applied to the window, as the original app did.
+- Fences are see-through on both platforms. On Windows a fence draws its page through DirectComposition, and the desktop shows through without blur.
 - Fences stay below other windows and off the taskbar on Linux. On Windows they start below other windows and stay off the taskbar, but a click can raise them.
 - Dropping files on a fence depends on the web view handing over file addresses. That's tested on Linux only.

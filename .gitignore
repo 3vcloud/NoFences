@@ -363,6 +363,3 @@ FodyWeavers.xsd
 /bin/
 /build/
 *.WebView2/
-# The WebView2 loader is built against, so it stays in the repository
-!/third_party/webview2/bin/
-!/third_party/webview2/bin/x64/

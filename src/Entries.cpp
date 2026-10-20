@@ -234,6 +234,12 @@ bool entryExists(const std::string& entry) {
     return std::filesystem::exists(pathFromUtf8(entry), error);
 }
 
+std::int64_t entryWriteStamp(const std::string& entry) {
+    std::error_code error;
+    const auto written = std::filesystem::last_write_time(pathFromUtf8(entry), error);
+    return error ? 0 : static_cast<std::int64_t>(written.time_since_epoch().count());
+}
+
 std::optional<std::vector<unsigned char>> entryIconPng(const std::string& entry) {
     if (const auto picture = pictureFor(entry)) {
         if (auto png = pictureIconPng(*picture)) {

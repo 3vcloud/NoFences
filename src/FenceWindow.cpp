@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <iterator>
+#include <set>
 #include <utility>
 
 #include "Entries.h"
@@ -18,8 +19,8 @@ namespace {
 // aren't offered.
 constexpr int kTopEdges[] = {0, 1, 2};
 
-gwl::WindowOptions windowOptions(const Fence& fence) {
-    gwl::WindowOptions options;
+WindowOptions windowOptions(const Fence& fence) {
+    WindowOptions options;
     options.title = fence.name;
     options.width = fence.width;
     options.height = fence.canMinify ? fence.titleHeight : fence.height;
@@ -32,6 +33,17 @@ gwl::WindowOptions windowOptions(const Fence& fence) {
     return options;
 }
 
+// The folders that hold the fence's files. A link has no folder, so it's left out.
+std::set<std::string> foldersOf(const std::vector<std::string>& entries) {
+    std::set<std::string> folders;
+    for (const std::string& entry : entries) {
+        if (!isLink(entry)) {
+            folders.insert(pathToUtf8(pathFromUtf8(entry).parent_path()));
+        }
+    }
+    return folders;
+}
+
 }  // namespace
 
 FenceWindow::FenceWindow(FenceApp& app, Fence fence)
@@ -41,6 +53,7 @@ FenceWindow::FenceWindow(FenceApp& app, Fence fence)
       minified_(fence_.canMinify),
       expandedHeight_(fence_.height) {
     registerMethods();
+    folderWatch_ = std::make_unique<DirectoryWatch>([this] { onFolderChanged(); });
 }
 
 std::string FenceWindow::html() const {
@@ -50,34 +63,34 @@ std::string FenceWindow::html() const {
 void FenceWindow::registerMethods() {
     auto& methods = handler();
 
-    methods.on("state", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) { reply.result(state()); });
+    methods.on("state", [this](WebViewWindow&, const Json&, const Reply& reply) { reply.result(state()); });
 
-    methods.on("open", [](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("open", [](WebViewWindow&, const Json& args, const Reply& reply) {
         openTarget(args.at(0).get<std::string>());
         reply.result(nullptr);
     });
 
-    methods.on("showInFolder", [](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("showInFolder", [](WebViewWindow&, const Json& args, const Reply& reply) {
         openTarget(pathToUtf8(pathFromUtf8(args.at(0).get<std::string>()).parent_path()));
         reply.result(nullptr);
     });
 
-    methods.on("openDesktop", [](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("openDesktop", [](WebViewWindow&, const Json&, const Reply& reply) {
         openTarget(pathToUtf8(desktopDirectory()));
         reply.result(nullptr);
     });
 
-    methods.on("openConfig", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("openConfig", [this](WebViewWindow&, const Json&, const Reply& reply) {
         openTarget(pathToUtf8(app_.store().metadataPath(fence_)));
         reply.result(nullptr);
     });
 
     // Takes what the page was dropped: file addresses from the file manager, or links from the browser.
     // Says in problems what wasn't added, and why, so a drop that does nothing still tells the user.
-    methods.on("addEntries", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("addEntries", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         bool added = false;
-        gwl::Json problems = gwl::Json::array();
-        for (const gwl::Json& uri : args.at(0)) {
+        Json problems = Json::array();
+        for (const Json& uri : args.at(0)) {
             const std::string text = uri.get<std::string>();
             const auto local = pathFromFileUri(text);
             const std::string entry = local ? *local : text;
@@ -95,12 +108,12 @@ void FenceWindow::registerMethods() {
         if (added) {
             save();
         }
-        gwl::Json result = state();
+        Json result = state();
         result["problems"] = problems;
         reply.result(result);
     });
 
-    methods.on("addLink",[this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("addLink",[this](WebViewWindow&, const Json& args, const Reply& reply) {
         const std::string link = trim(args.at(0).get<std::string>());
         if (!isLink(link) || startsWith(link, "file://")) {
             reply.error("That isn't a link. Use an address such as steam://rungameid/1091500 or https://...");
@@ -113,21 +126,21 @@ void FenceWindow::registerMethods() {
         reply.result(state());
     });
 
-    methods.on("remove", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("remove", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         const std::string entry = args.at(0).get<std::string>();
         fence_.files.erase(std::remove(fence_.files.begin(), fence_.files.end(), entry), fence_.files.end());
         save();
         reply.result(state());
     });
 
-    methods.on("rename", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("rename", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         fence_.name = args.at(0).get<std::string>();
         setTitle(fence_.name);
         save();
         reply.result(state());
     });
 
-    methods.on("setTitleHeight", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("setTitleHeight", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         fence_.titleHeight = validTitleHeight(args.at(0).get<int>());
         if (minified_) {
             resizeHeight(fence_.titleHeight);
@@ -136,13 +149,13 @@ void FenceWindow::registerMethods() {
         reply.result(state());
     });
 
-    methods.on("setLocked", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("setLocked", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         fence_.locked = args.at(0).get<bool>();
         save();
         reply.result(state());
     });
 
-    methods.on("setMinify", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("setMinify", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         fence_.canMinify = args.at(0).get<bool>();
         if (fence_.canMinify) {
             minify();
@@ -154,63 +167,64 @@ void FenceWindow::registerMethods() {
     });
 
     // The page asks these as the pointer leaves or enters the fence. Only the fence's own setting decides.
-    methods.on("minify", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("minify", [this](WebViewWindow&, const Json&, const Reply& reply) {
         minify();
-        reply.result(gwl::Json{{"minified", minified_}});
+        reply.result(Json{{"minified", minified_}});
     });
 
-    methods.on("expand", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("expand", [this](WebViewWindow&, const Json&, const Reply& reply) {
         expand();
-        reply.result(gwl::Json{{"minified", minified_}});
+        reply.result(Json{{"minified", minified_}});
     });
 
-    methods.on("beginMove", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("beginMove", [this](WebViewWindow&, const Json&, const Reply& reply) {
         if (!fence_.locked) {
             beginMove();
         }
         reply.result(nullptr);
     });
 
-    methods.on("beginResize", [this](gwl::WebViewWindow&, const gwl::Json& args, const gwl::Reply& reply) {
+    methods.on("beginResize", [this](WebViewWindow&, const Json& args, const Reply& reply) {
         const int edge = args.at(0).get<int>();
         const bool topEdge = minified_ && std::find(std::begin(kTopEdges), std::end(kTopEdges), edge) != std::end(kTopEdges);
         if (!fence_.locked && !topEdge && edge >= 0 && edge <= 7) {
-            beginResize(static_cast<gwl::ResizeEdge>(edge));
+            beginResize(static_cast<ResizeEdge>(edge));
         }
         reply.result(nullptr);
     });
 
-    methods.on("newFence", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("newFence", [this](WebViewWindow&, const Json&, const Reply& reply) {
         app_.createFence("New fence");
         reply.result(nullptr);
     });
 
-    methods.on("removeFence", [this](gwl::WebViewWindow&, const gwl::Json&, const gwl::Reply& reply) {
+    methods.on("removeFence", [this](WebViewWindow&, const Json&, const Reply& reply) {
         removeFence();
         reply.result(nullptr);
     });
 }
 
-gwl::Json FenceWindow::state() {
-    gwl::Json items = gwl::Json::array();
+Json FenceWindow::state() {
+    folderWatch_->setFolders(foldersOf(fence_.files));
+    Json items = Json::array();
     for (const std::string& entry : fence_.files) {
         if (!entryExists(entry)) {
             continue;
         }
-        items.push_back(gwl::Json{
+        items.push_back(Json{
             {"path", entry},
             {"label", entryLabel(entry)},
             {"link", isLink(entry)},
             {"icon", iconFor(entry)},
         });
     }
-    return gwl::Json{
+    return Json{
         {"name", fence_.name},
         {"locked", fence_.locked},
         {"canMinify", fence_.canMinify},
         {"minified", minified_},
         {"titleHeight", fence_.titleHeight},
-        {"transparent", gwl::transparentBackgroundSupported()},
+        {"transparent", transparentBackgroundSupported()},
         {"items", items},
     };
 }
@@ -255,7 +269,7 @@ void FenceWindow::saveFrame() {
     } catch (const std::exception& problem) {
         if (!saveFailed_) {
             saveFailed_ = true;
-            gwl::showError(std::string("NoFences couldn't save this fence's position and size.\n") + problem.what());
+            showError(std::string("NoFences couldn't save this fence's position and size.\n") + problem.what());
         }
     }
 }
@@ -294,20 +308,28 @@ void FenceWindow::resizeHeight(int height) {
 void FenceWindow::removeFence() {
     app_.store().remove(fence_);
     removed_ = true;
-    gwl::runOnUiThread([this] { close(); });
+    runOnUiThread([this] { close(); });
 }
 
 std::string FenceWindow::iconFor(const std::string& entry) {
+    const std::int64_t stamp = entryWriteStamp(entry);
     auto cached = icons_.find(entry);
-    if (cached != icons_.end()) {
-        return cached->second;
+    if (cached != icons_.end() && cached->second.stamp == stamp) {
+        return cached->second.url;
     }
     std::string url;
     if (const auto png = entryIconPng(entry)) {
         url = "data:image/png;base64," + base64Encode(*png);
     }
-    icons_[entry] = url;
+    icons_[entry] = {stamp, url};
     return url;
+}
+
+void FenceWindow::onFolderChanged() {
+    if (removed_) {
+        return;
+    }
+    runScript("if (window.refreshFromHost) { window.refreshFromHost(); }");
 }
 
 }  // namespace nofences

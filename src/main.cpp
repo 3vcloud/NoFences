@@ -19,15 +19,16 @@ int main() {
         if (!nofences::claimSingleInstance(dataDirectory)) {
             return 0;
         }
-        gwl::initializeWindowing();
+        setApplicationName("NoFences");
+        initializeWindowing();
         nofences::FenceApp app{nofences::FenceStore(dataDirectory)};
         app.start();
-        gwl::runEventLoop();
-    } catch (const gwl::RuntimeMissingError&) {
+        runEventLoop();
+    } catch (const RuntimeMissingError&) {
         // The dialog has already said what's missing.
         return 1;
     } catch (const std::exception& error) {
-        gwl::showError(error.what());
+        showError(error.what());
         return 1;
     }
     return 0;

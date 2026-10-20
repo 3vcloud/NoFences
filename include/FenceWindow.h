@@ -2,9 +2,12 @@
 
 #pragma once
 
+#include <cstdint>
 #include <map>
+#include <memory>
 #include <string>
 
+#include "DirectoryWatch.h"
 #include "Fence.h"
 #include "WebViewWindow.h"
 
@@ -12,7 +15,7 @@ namespace nofences {
 
 class FenceApp;
 
-class FenceWindow : public gwl::WebViewWindow {
+class FenceWindow : public WebViewWindow {
 public:
     FenceWindow(FenceApp& app, Fence fence);
 
@@ -24,8 +27,14 @@ protected:
     void onFrameChanged() override;
 
 private:
+    // An icon as the page shows it, with the write stamp of the file it was read from.
+    struct CachedIcon {
+        std::int64_t stamp = 0;
+        std::string url;
+    };
+
     void registerMethods();
-    gwl::Json state();
+    Json state();
     void save();
     void saveFrame();
     void minify();
@@ -33,6 +42,8 @@ private:
     void resizeHeight(int height);
     void removeFence();
     std::string iconFor(const std::string& entry);
+    // A file in one of the fence's folders was written, renamed or removed, so the page asks for its state again.
+    void onFolderChanged();
 
     FenceApp& app_;
     Fence fence_;
@@ -43,8 +54,10 @@ private:
     bool removed_ = false;
     // Set while saving the window's position is failing, so the failure is reported once.
     bool saveFailed_ = false;
-    // Icon data URLs by entry, so each icon is read from the system once.
-    std::map<std::string, std::string> icons_;
+    // Icons by entry, so each is read from the system once, and again only when its file has been written since.
+    std::map<std::string, CachedIcon> icons_;
+    // Reports changes in the folders that hold the fence's files.
+    std::unique_ptr<DirectoryWatch> folderWatch_;
 };
 
 }  // namespace nofences

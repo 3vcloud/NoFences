@@ -208,7 +208,6 @@ void* themedPixbuf(const GtkLibrary& gtk, void* icon) {
 
 }  // namespace
 
-namespace gwl {
 
 void showError(const std::string& message) {
     std::fprintf(stderr, "%s\n", message.c_str());
@@ -251,7 +250,6 @@ std::optional<Rect> workAreaAt(const Rect&) {
     return std::nullopt;
 }
 
-}  // namespace gwl
 
 namespace nofences {
 
@@ -330,8 +328,8 @@ void openTarget(const std::string& target) {
         std::error_code error;
         std::filesystem::remove(errorFile, error);
         if (!succeeded) {
-            gwl::runOnUiThread([target, output] {
-                gwl::showError("NoFences couldn't open " + target + (output.empty() ? "." : ":\n" + output));
+            runOnUiThread([target, output] {
+                showError("NoFences couldn't open " + target + (output.empty() ? "." : ":\n" + output));
             });
         }
     }).detach();
@@ -399,7 +397,7 @@ bool claimSingleInstance(const std::filesystem::path& dataDirectory) {
     // The descriptor stays open, so the lock is held until the program exits.
     static const int descriptor = open((dataDirectory / ".lock").c_str(), O_CREAT | O_RDWR | O_CLOEXEC, 0644);
     if (descriptor < 0) {
-        gwl::showError("NoFences couldn't create its lock file in " + pathToUtf8(dataDirectory) + " (" + std::strerror(errno) +
+        showError("NoFences couldn't create its lock file in " + pathToUtf8(dataDirectory) + " (" + std::strerror(errno) +
                        "), so it can't tell whether another copy is running. It will start anyway.");
         return true;
     }

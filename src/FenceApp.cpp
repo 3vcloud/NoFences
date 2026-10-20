@@ -20,7 +20,7 @@ void FenceApp::start() {
         const std::string name = fence.name;
         try {
             openFence(std::move(fence));
-        } catch (const gwl::RuntimeMissingError&) {
+        } catch (const RuntimeMissingError&) {
             throw;
         } catch (const std::exception& problem) {
             failures.push_back(name + " (" + problem.what() + ")");
@@ -44,7 +44,7 @@ void FenceApp::start() {
                 message += "\n- " + item;
             }
         }
-        gwl::showError(message);
+        showError(message);
     }
 }
 
@@ -72,10 +72,10 @@ void FenceApp::windowClosed(FenceWindow* window) {
     }
     closed_.push_back(std::move(*found));
     windows_.erase(found);
-    gwl::runOnUiThread([this] {
+    runOnUiThread([this] {
         closed_.clear();
         if (windows_.empty()) {
-            gwl::stopEventLoop();
+            stopEventLoop();
         }
     });
 }
