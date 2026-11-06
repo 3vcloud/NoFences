@@ -21,6 +21,9 @@ public:
 
     std::string html() const override;
     std::string title() const override { return fence_.name; }
+    std::string pageReloadedMessage() const override {
+        return "The page of a fence stopped unexpectedly, so it has been loaded again.";
+    }
 
 protected:
     void onClosed() override;
