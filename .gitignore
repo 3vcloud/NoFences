@@ -359,3 +359,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+# NoFences C++ build output and the WebView2 data folder beside the Windows executable
+/bin/
+/build/
+*.WebView2/

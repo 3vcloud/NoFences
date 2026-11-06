@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create, such as v1.0.0"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Work out the release tag
+        id: tag
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            tag="${{ inputs.tag }}"
+          else
+            tag="${GITHUB_REF_NAME}"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+
+      - name: Install the build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y cmake ninja-build g++-mingw-w64-x86-64 zip
+
+      - name: Build both targets
+        # Run through bash, since the executable bit isn't kept on every checkout.
+        run: bash build.sh all
+
+      - name: Package the builds
+        env:
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          # The desktop entry is left out: its Exec line holds this runner's path, which isn't valid on anyone else's machine.
+          tar -C bin/linux -czf "dist/NoFences-${TAG}-linux-x86_64.tar.gz" NoFences
+          (cd bin/windows && zip -q "${GITHUB_WORKSPACE}/dist/NoFences-${TAG}-windows-x64.zip" NoFences.exe WebView2Loader.dll)
+          ls -l dist
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.tag.outputs.tag }}
+        run: |
+          # Creates the tag at this commit when it doesn't exist yet; a pushed tag is used as it is.
+          gh release create "${TAG}" dist/* \
+            --repo "${GITHUB_REPOSITORY}" \
+            --target "${GITHUB_SHA}" \
+            --title "NoFences ${TAG}" \
+            --generate-notes
