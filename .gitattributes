@@ -1,0 +1,14 @@
+# Store text as LF in the repository; each checkout gets its platform's line endings.
+* text=auto
+
+# Shell scripts run on Linux, so they keep LF even on a Windows checkout.
+*.sh text eol=lf
+
+# Binary files are never converted.
+*.dll binary
+*.exe binary
+*.lib binary
+*.png binary
+*.jpg binary
+*.ico binary
+*.zip binary
